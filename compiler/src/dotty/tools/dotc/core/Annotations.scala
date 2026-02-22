@@ -233,7 +233,7 @@ object Annotations {
           New(defn.ChildAnnot.typeRef.appliedTo(sym.owner.thisType.select(sym.name, sym)), Nil)
             .withSpan(span)
         }
-        deferred(defn.ChildAnnot)(makeChildLater)
+        deferredSymAndTree(defn.ChildAnnot)(makeChildLater)
       }
 
       /** A regular, non-deferred Child annotation */
@@ -303,7 +303,7 @@ object Annotations {
         case annot @ ExperimentalAnnotation(msg) => ExperimentalAnnotation(msg, annot.tree.span)
       }
   }
-  
+
   object PreviewAnnotation {
     /** Matches and extracts the message from an instance of `@preview(msg)`
      *  Returns `Some("")` for `@preview` with no message.
