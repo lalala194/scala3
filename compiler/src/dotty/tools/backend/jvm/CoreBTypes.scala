@@ -64,6 +64,8 @@ abstract class CoreBTypes(private val frontendAccess: PostProcessorFrontendAcces
   def jliLambdaMetaFactoryAltMetafactoryHandle : Handle
   def jliLambdaDeserializeBootstrapHandle      : Handle
   def jliStringConcatFactoryMakeConcatWithConstantsHandle: Handle
+  def jliSwitchBootstrapsTypeSwitchHandle      : Handle
+  def jliSwitchBootstrapsEnumSwitchHandle      : Handle
 
   def asmBoxTo  : Map[BType, MethodNameAndType]
   def asmUnboxTo: Map[BType, MethodNameAndType]

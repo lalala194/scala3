@@ -16,6 +16,8 @@ import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.core.StdNames.{nme, str}
 import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.transform.Erasure
+import dotty.tools.dotc.transform.PatternMatcher
+import dotty.tools.dotc.core.TypeErasure
 import dotty.tools.dotc.util.Spans.*
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Phases.*
@@ -974,9 +976,11 @@ trait BCodeBodyBuilder(val primitives: ScalaPrimitives)(using ctx: Context) exte
         else
           (expectedType, null, dest)
 
-      // Only two possible selector types exist in `Match` trees at this point: Int and String
-      if (tpeTK(selector) == INT) {
-
+      if tree.hasAttachment(PatternMatcher.TypeSwitchKey) then
+        genTypeSwitchMatch(selector, cases, tree.getAttachment(PatternMatcher.TypeSwitchKey).get,
+                           generatedType, postMatchDest)
+      // Only two possible (non-type-switch) selector types exist in `Match` trees at this point: Int and String
+      else if (tpeTK(selector) == INT) {
         /* On a first pass over the case clauses, we flatten the keys and their
          * targets (the latter represented with asm.Labels). That representation
          * allows JCodeMethodV to emit a lookupswitch or a tableswitch.
@@ -1033,7 +1037,6 @@ trait BCodeBodyBuilder(val primitives: ScalaPrimitives)(using ctx: Context) exte
           markProgramPoint(default)
           emitThrowMatchError()
       } else {
-
         /* Since the JVM doesn't have a way to switch on a string, we  switch
          * on the `hashCode` of the string then do an `equals` check (with a
          * possible second set of jumps if blocks can be reach from multiple
@@ -1146,6 +1149,64 @@ trait BCodeBodyBuilder(val primitives: ScalaPrimitives)(using ctx: Context) exte
       if postMatch != null then
         markProgramPoint(postMatch)
       generatedType
+    }
+
+    private def genTypeSwitchMatch(
+        selector: Tree,
+        cases: List[CaseDef],
+        info: PatternMatcher.TypeSwitchInfo,
+        generatedType: BType,
+        postMatchDest: LoadDestination): Unit = {
+      import PatternMatcher.{ClassLabel, StringLabel, IntegerLabel}
+
+      val labelsSize = info.labels.size
+      val restartIndex = 0
+      val bsmArgs: Array[AnyRef] = info.labels.map {
+        case ClassLabel(tpe)  => ts.toTypeKind(TypeErasure.erasure(tpe)).toASMType
+        case StringLabel(v)   => v
+        case IntegerLabel(v)  => Int.box(v)
+      }.toArray
+
+      val (indyName, bsmHandle) =
+        if info.isEnumBootstrap then ("enumSwitch", ts.jliSwitchBootstrapsEnumSwitchHandle)
+        else ("typeSwitch", ts.jliSwitchBootstrapsTypeSwitchHandle)
+      val selBType =
+        if info.isEnumBootstrap then ts.toTypeKind(TypeErasure.erasure(info.selectorTpe))
+        else ts.ObjectRef
+      val callDesc = s"(${selBType.descriptor}I)I"
+
+      genLoad(selector, selBType)
+      bc.iconst(restartIndex)
+      bc.jmethod.visitInvokeDynamicInsn(indyName, callDesc, bsmHandle, bsmArgs*)
+
+      var k = 0
+      val nullCaseDef     = if info.hasNullCase then { val cd = cases(k); k += 1; Some(cd) } else None
+      val contentCaseDefs = cases.slice(k, k + labelsSize); k += labelsSize
+      val defaultCaseDef  = if k < cases.size then Some(cases(k)) else None
+
+      val nullLabel    = nullCaseDef.map(_ => new asm.Label)
+      val caseLabels   = Array.fill(labelsSize)(new asm.Label)
+      val defaultLabel = new asm.Label
+
+      val keys    = List.newBuilder[Int]
+      val targets = List.newBuilder[asm.Label]
+      nullLabel.foreach { l => keys += -1; targets += l }
+      for (i <- 0 until labelsSize) {
+        keys += i
+        targets += caseLabels(i)
+      }
+      bc.emitSWITCH(keys.result().toArray, targets.result().toArray, defaultLabel, MIN_SWITCH_DENSITY)
+
+      nullCaseDef.foreach { cd =>
+        markProgramPoint(nullLabel.get)
+        genLoadTo(cd.body, generatedType, postMatchDest)
+      }
+      for (i <- 0 until labelsSize) {
+        markProgramPoint(caseLabels(i))
+        genLoadTo(contentCaseDefs(i).body, generatedType, postMatchDest)
+      }
+      markProgramPoint(defaultLabel)
+      defaultCaseDef.fold(emitThrowMatchError())(cd => genLoadTo(cd.body, generatedType, postMatchDest))
     }
 
     def genBlockTo(tree: Block, expectedType: BType, dest: LoadDestination): Unit = tree match {

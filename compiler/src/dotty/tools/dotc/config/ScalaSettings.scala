@@ -582,6 +582,7 @@ private sealed trait YSettings:
   val YccLog: Setting[Boolean] = BooleanSetting(ForkSetting, "Ycc-log", "Used in conjunction with captureChecking language import, print tracing and debug info")
   val YccVerbose: Setting[Boolean] = BooleanSetting(ForkSetting, "Ycc-verbose", "Print root capabilities with more details")
   val YccPrintSetup: Setting[Boolean] = BooleanSetting(ForkSetting, "Ycc-print-setup", "Used in conjunction with captureChecking language import, print trees after cc.Setup phase")
+  val YemitTypeSwitchIndy: Setting[Boolean] = BooleanSetting(ForkSetting, "Yemit-typeswitch-indy", "Lower reference `match` expressions to invokedynamic java.lang.runtime.SwitchBootstraps.typeSwitch/enumSwitch (requires a JVM target of 21 or higher).")
 
   /** Area-specific debug output */
   val YexplainLowlevel: Setting[Boolean] = BooleanSetting(ForkSetting, "Yexplain-lowlevel", "When explaining type errors, show types at a lower level.")

@@ -435,6 +435,9 @@ final class CoreBTypesFromSymbols(ppa: PostProcessorFrontendAccess, primitives: 
   private def jliStringConcatFactoryRef: ClassBType = _jliStringConcatFactoryRef.get
   private lazy val _jliStringConcatFactoryRef: Lazy[ClassBType] = ppa.perRunLazy(classBTypeFromSymbol(requiredClass("java.lang.invoke.StringConcatFactory")))
 
+  private def jliSwitchBootstrapsRef: ClassBType = _jliSwitchBootstrapsRef.get
+  private lazy val _jliSwitchBootstrapsRef: Lazy[ClassBType] = ppa.perRunLazy(classBTypeFromSymbol(requiredClass("java.lang.runtime.SwitchBootstraps")))
+
   private def srLambdaDeserialize: ClassBType = _srLambdaDeserialize.get
   private lazy val _srLambdaDeserialize: Lazy[ClassBType] = ppa.perRunLazy(classBTypeFromSymbol(requiredClass[scala.runtime.LambdaDeserialize]))
 
@@ -479,6 +482,28 @@ final class CoreBTypesFromSymbols(ppa: PostProcessorFrontendAccess, primitives: 
     "makeConcatWithConstants",
     MethodBType(
       List(jliMethodHandlesLookupRef, StringRef, jliMethodTypeRef, StringRef, ArrayBType(ObjectRef)),
+      jliCallSiteRef
+    ).descriptor,
+    /* itf = */ false)}
+
+  override def jliSwitchBootstrapsTypeSwitchHandle: Handle = _jliSwitchBootstrapsTypeSwitchHandle.get
+  private lazy val _jliSwitchBootstrapsTypeSwitchHandle: Lazy[Handle] = ppa.perRunLazy { new Handle(
+    Opcodes.H_INVOKESTATIC,
+    jliSwitchBootstrapsRef.internalName,
+    "typeSwitch",
+    MethodBType(
+      List(jliMethodHandlesLookupRef, StringRef, jliMethodTypeRef, ArrayBType(ObjectRef)),
+      jliCallSiteRef
+    ).descriptor,
+    /* itf = */ false)}
+
+  override def jliSwitchBootstrapsEnumSwitchHandle: Handle = _jliSwitchBootstrapsEnumSwitchHandle.get
+  private lazy val _jliSwitchBootstrapsEnumSwitchHandle: Lazy[Handle] = ppa.perRunLazy { new Handle(
+    Opcodes.H_INVOKESTATIC,
+    jliSwitchBootstrapsRef.internalName,
+    "enumSwitch",
+    MethodBType(
+      List(jliMethodHandlesLookupRef, StringRef, jliMethodTypeRef, ArrayBType(ObjectRef)),
       jliCallSiteRef
     ).descriptor,
     /* itf = */ false)}
